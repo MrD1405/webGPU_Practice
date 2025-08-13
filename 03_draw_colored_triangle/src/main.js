@@ -1,12 +1,10 @@
-const outputLabel=document.getElementById("outputLabel");
+import createGPUBuffer from "./render.js";
+
+
+
+
 const canvas=document.getElementById("canvas");
-console.log(navigator.gpu);
-if(navigator.gpu){
-    outputLabel.innerHTML="WebGPU is supported!";
-}
-else{
-    outputLabel.innerHTML="WebGPU is not supported in this browser.";
-}
+
 //kind of like driver that allows talking to the GPU
 const adapter=await navigator.gpu.requestAdapter();
 
@@ -57,9 +55,9 @@ const positionBufferLayoutDesc={
 }
 
 const positions=new Float32Array([
-    1.0,-1.0,0.0,
-    -1.0,1.0,0.0,
     0.0,1.0,0.0,
+    -1.0,-1.0,0.0,
+    1.0,-1.0,0.0,
 ]);
 
 const positionBufferDesc={
@@ -67,6 +65,25 @@ const positionBufferDesc={
     usage:GPUBufferUsage.VERTEX,
     mappedAtCreation:true
 };
+
+const colorAttributeDesc={
+    shaderLocation:1,
+    offset:0,
+    format:'float32x3',
+}
+const colorBufferLayoutDesc={
+    attributes:[colorAttributeDesc],
+    arrayStride:4*3,
+    stepMode:'vertex',
+}
+const colors=new Float32Array([
+    1.0,0.0,0.0,
+    0.0,1.0,0.0,
+    0.0,0.0,1.0,
+]);
+
+const colorBuffer=createGPUBuffer(device, colors,GPUBufferUsage.VERTEX);
+
 let positionBuffer=device.createBuffer(positionBufferDesc);
 const writeArray=new Float32Array(positionBuffer.getMappedRange());
 writeArray.set(positions);
@@ -85,12 +102,12 @@ const renderPipelineDesc={
     vertex:{
         module:shaderModule,
         entryPoint:'vs_main',
-        buffers:[positionBufferLayoutDesc],
+        buffers:[positionBufferLayoutDesc,colorBufferLayoutDesc],
     },
     fragment:{
         module:shaderModule,
         entryPoint:'fs_main',
-        targets:[{format:colorFormat}],
+        targets:[colorFormat],
     },
     primitive:{
         topology:'triangle-list',
@@ -110,7 +127,7 @@ let colorTextureView=colorTexture.createView();
 //acts as a buffer that holds color information or pixels
 let colorAttachment={
     view:colorTextureView,
-    clearValue:[1,0,0,1],
+    clearValue:{r:0.5,g:0.5,b:0.5,a:1},
     loadOp:'clear',
     storeOp:'store'
 };
@@ -125,6 +142,7 @@ let commandEncoder=device.createCommandEncoder();
 let renderPassEncoder=commandEncoder.beginRenderPass(renderPassDesc);
 //renderPassEncoder.setViewPort(0,0,canvas.width,canvas.height,0,1);
 renderPassEncoder.setVertexBuffer(0,positionBuffer);
+renderPassEncoder.setVertexBuffer(1,colorBuffer);
 renderPassEncoder.setPipeline(pipeline);
 
 renderPassEncoder.draw(3,1);
